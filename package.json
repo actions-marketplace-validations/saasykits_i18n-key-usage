@@ -1,6 +1,6 @@
 {
   "name": "i18n-key-usage",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Find unused, missing and unresolved i18n message keys in TypeScript projects. Follows keys across modules, types and helpers; fast oxc parser.",
   "keywords": [
     "i18n",
@@ -27,7 +27,7 @@
     "node": ">=20.19"
   },
   "bin": {
-    "i18n-key-usage": "./dist/cli.mjs"
+    "i18n-key-usage": "dist/cli.mjs"
   },
   "exports": {
     ".": {
@@ -53,8 +53,7 @@
     "check": "biome check .",
     "format": "biome check --write .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "prepublishOnly": "pnpm build"
+    "test": "vitest run"
   },
   "dependencies": {
     "get-tsconfig": "^4.14.3",
