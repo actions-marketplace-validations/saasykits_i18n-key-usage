@@ -618,4 +618,19 @@ describe("message usage", () => {
       ),
     );
   });
+  it("resolves templates over enum and string-union typed values without families", () => {
+    const result = check(
+      `
+      import { useTranslations } from 'next-intl';
+      enum EStatus { Open = 'open', Closed = 'closed' }
+      type TSize = 'small' | 'large';
+      export function Row({ status, size }: { status: EStatus; size: TSize }) {
+        const t = useTranslations('orders');
+        return t(\`status.\${status}\`) + t(\`size.\${size}\`);
+      }
+      `,
+      ["orders.status.open", "orders.status.closed", "orders.size.small", "orders.size.large"],
+    );
+    expectClean(result);
+  });
 });
