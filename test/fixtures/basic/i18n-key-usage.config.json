@@ -1,0 +1,5 @@
+{
+  "$schema": "../../../schema.json",
+  "messages": "messages/en.json",
+  "include": ["src/**/*.{ts,tsx}"]
+}

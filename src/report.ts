@@ -62,15 +62,19 @@ export function formatJson(report: IReport): string {
   return `${JSON.stringify(report, null, 2)}\n`;
 }
 
-/** Workflow commands that show up as annotations on the pull request diff. */
-export function formatGithub(report: IReport): string {
+/**
+ * Workflow commands that show up as annotations on the pull request diff. `prefix` is the project
+ * root relative to the repository root, since annotation paths are repository-relative.
+ */
+export function formatGithub(report: IReport, prefix = ""): string {
   const lines: string[] = [];
+  const path = (file: string) => (prefix ? `${prefix}/${file}` : file);
   for (const { key, file } of report.unused)
-    lines.push(command("error", `Unused message key: ${key}`, file ? { file } : {}));
+    lines.push(command("error", `Unused message key: ${key}`, file ? { file: path(file) } : {}));
   for (const diagnostic of [...report.missing, ...report.unresolved])
     lines.push(
       command("error", `${diagnostic.message}: ${diagnostic.expression}`, {
-        file: diagnostic.file,
+        file: path(diagnostic.file),
         line: String(diagnostic.line),
       }),
     );

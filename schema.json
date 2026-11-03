@@ -1,0 +1,249 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "library": {
+      "default": "next-intl",
+      "description": "i18n library whose translators and catalogs are recognized.",
+      "type": "string",
+      "enum": [
+        "next-intl"
+      ]
+    },
+    "messages": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Source-locale catalog: a JSON file, or a directory with one JSON file per top-level namespace."
+    },
+    "catalogs": {
+      "default": [
+        "messages/*"
+      ],
+      "description": "Globs of catalog files or directories. Importing one is a catalog read.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "include": {
+      "default": [
+        "**/*.{ts,tsx}"
+      ],
+      "description": "Globs of sources to scan.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "exclude": {
+      "default": [
+        "**/node_modules/**",
+        "**/.next/**",
+        "**/dist/**",
+        "**/build/**",
+        "**/coverage/**",
+        "**/*.d.ts",
+        "**/*.{test,spec,generated}.{ts,tsx}",
+        "**/{__tests__,__fixtures__,test,tests,testing}/**"
+      ],
+      "description": "Globs excluded from include.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "tsconfig": {
+      "default": "tsconfig.json",
+      "description": "tsconfig whose compilerOptions.paths resolve import aliases.",
+      "type": "string"
+    },
+    "keyTypes": {
+      "default": [],
+      "description": "Types whose values are message keys, e.g. a TMessageKey alias.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "minLength": 1,
+            "description": "File path relative to the project root."
+          },
+          "export": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Export name."
+          }
+        },
+        "required": [
+          "file",
+          "export"
+        ]
+      }
+    },
+    "translatorTypes": {
+      "default": [],
+      "description": "Types whose values are translators, e.g. an interface with a call signature.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "minLength": 1,
+            "description": "File path relative to the project root."
+          },
+          "export": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Export name."
+          }
+        },
+        "required": [
+          "file",
+          "export"
+        ]
+      }
+    },
+    "messageLoaders": {
+      "default": [],
+      "description": "Functions that return the whole catalog.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "minLength": 1,
+            "description": "File path relative to the project root."
+          },
+          "export": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Export name."
+          }
+        },
+        "required": [
+          "file",
+          "export"
+        ]
+      }
+    },
+    "keyFunctions": {
+      "default": [],
+      "description": "Functions whose argument at `argument` (zero-based) is a message key.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "minLength": 1,
+            "description": "File path relative to the project root."
+          },
+          "export": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Export name."
+          },
+          "argument": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "file",
+          "export",
+          "argument"
+        ]
+      }
+    },
+    "keyProperties": {
+      "default": [],
+      "description": "Object properties whose string values are message keys, e.g. \"labelKey\".",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "validationLibraries": {
+      "default": [],
+      "description": "Modules whose call arguments may be message keys, e.g. \"zod\".",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "literalKeyPrefixes": {
+      "default": [],
+      "description": "Any string literal with one of these prefixes is a message key, e.g. \"errors.\".",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "families": {
+      "default": [],
+      "description": "Dynamic key families backed by a finite set of values in code.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "description": "Key pattern with exactly one *, e.g. status.*"
+          },
+          "source": {
+            "type": "string",
+            "description": "File that exports the finite values."
+          },
+          "export": {
+            "type": "string",
+            "description": "Enum, object or union type that lists the values."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Why the key is built at runtime."
+          }
+        },
+        "required": [
+          "pattern",
+          "source",
+          "export",
+          "reason"
+        ]
+      }
+    },
+    "retained": {
+      "default": [],
+      "description": "Keys kept although no code references them, e.g. for historical data.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "key",
+          "reason"
+        ]
+      }
+    }
+  },
+  "required": [
+    "messages"
+  ],
+  "additionalProperties": false,
+  "title": "i18n-key-usage config"
+}

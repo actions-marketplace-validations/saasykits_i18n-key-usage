@@ -1,0 +1,53 @@
+name: i18n key usage
+description: Find unused, missing and unresolved i18n message keys and annotate them on pull requests.
+author: Touha
+branding:
+  icon: globe
+  color: blue
+
+inputs:
+  config:
+    description: Config file, relative to working-directory.
+    default: i18n-key-usage.config.json
+  working-directory:
+    description: Project root that contains the config and sources.
+    default: .
+  version:
+    description: >-
+      Package version to run, or an absolute path to a local checkout. Defaults to the version
+      matching the action ref (v1 runs the latest 1.x release); any other ref runs the latest
+      release.
+    default: ""
+
+outputs:
+  exit-code:
+    description: 0 when clean, 1 when problems were found, 2 on a configuration error.
+    value: ${{ steps.check.outputs.exit-code }}
+
+runs:
+  using: composite
+  steps:
+    - id: check
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_VERSION: ${{ inputs.version }}
+        ACTION_REF: ${{ github.action_ref }}
+      run: |
+        version="$INPUT_VERSION"
+        if [ -z "$version" ]; then
+          if [[ "$ACTION_REF" =~ ^v?([0-9]+(\.[0-9]+){0,2})$ ]]; then
+            version="${BASH_REMATCH[1]}"
+          else
+            version="latest"
+          fi
+        fi
+        package="i18n-key-usage@$version"
+        if [[ "$version" == /* ]]; then package="$version"; fi
+        set +e
+        npx --yes --package "$package" i18n-key-usage --config "$INPUT_CONFIG" --format github
+        code=$?
+        set -e
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        exit "$code"

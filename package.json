@@ -1,8 +1,49 @@
 {
   "name": "i18n-key-usage",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
+  "description": "Find unused, missing and unresolved i18n message keys in TypeScript projects. Follows keys across modules, types and helpers; fast oxc parser.",
+  "keywords": [
+    "i18n",
+    "next-intl",
+    "translations",
+    "unused keys",
+    "missing keys",
+    "lint",
+    "github-action",
+    "oxc"
+  ],
+  "license": "MIT",
+  "author": "Touha",
   "type": "module",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "bin": {
+    "i18n-key-usage": "./dist/cli.mjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    },
+    "./schema.json": "./schema.json",
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "files": [
+    "dist",
+    "schema.json"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "schema": "tsx scripts/schema.ts",
+    "check": "biome check .",
+    "format": "biome check --write .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "pnpm build"
+  },
   "dependencies": {
     "get-tsconfig": "^4.14.3",
     "oxc-parser": "0.157.0",
@@ -14,8 +55,10 @@
     "@biomejs/biome": "2.6.2",
     "@types/node": "^24.19.2",
     "@types/picomatch": "^4.0.3",
+    "tsdown": "^0.23.4",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
-  }
+  },
+  "packageManager": "pnpm@10.32.1"
 }

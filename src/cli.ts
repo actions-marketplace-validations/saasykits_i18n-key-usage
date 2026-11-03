@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { appendFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { checkMessageUsage } from "./analyzer/check";
 import { CONFIG_FILE, ConfigError, loadConfig } from "./config";
@@ -50,7 +50,8 @@ function main(): number {
     process.stderr.write(`Unknown format: ${format}\n`);
     return 2;
   }
-  const { options, keyFiles } = loadConfig(resolve(values.root), values.config);
+  const root = resolve(values.root);
+  const { options, keyFiles } = loadConfig(root, values.config);
   const result = checkMessageUsage({
     ...options,
     onFile: values.progress
@@ -62,12 +63,20 @@ function main(): number {
     format === EReportFormat.Json
       ? formatJson(report)
       : format === EReportFormat.Github
-        ? formatGithub(report)
+        ? formatGithub(report, repositoryPrefix(root))
         : formatText(report);
   process.stdout.write(output);
   const summary = process.env.GITHUB_STEP_SUMMARY;
   if (format === EReportFormat.Github && summary) appendFileSync(summary, formatSummary(report));
   return hasProblems(report) ? 1 : 0;
+}
+
+/** The project root relative to the checked-out repository, for annotation paths. */
+function repositoryPrefix(root: string): string {
+  const workspace = process.env.GITHUB_WORKSPACE;
+  if (!workspace) return "";
+  const path = relative(resolve(workspace), root).replaceAll("\\", "/");
+  return path.startsWith("..") ? "" : path;
 }
 
 try {
