@@ -1,4 +1,4 @@
-# @saasykits/i18n-key-usage
+# i18n-key-usage
 
 Find unused, missing and unresolved i18n message keys in TypeScript projects.
 
@@ -23,14 +23,14 @@ library-agnostic; adapters for other libraries are welcome (see [Adapters](#adap
 ## Quick start
 
 ```bash
-npm install --save-dev @saasykits/i18n-key-usage
+npm install --save-dev i18n-key-usage
 ```
 
 Create `i18n-key-usage.config.json` in the project root:
 
 ```json
 {
-  "$schema": "./node_modules/@saasykits/i18n-key-usage/schema.json",
+  "$schema": "./node_modules/i18n-key-usage/schema.json",
   "messages": "messages/en.json"
 }
 ```
@@ -149,7 +149,7 @@ export const STATUS_LABELS: Record<EOrderStatus, TMessageKey> = {
 ## Programmatic API
 
 ```ts
-import { checkMessageUsage, createReport, loadConfig } from "@saasykits/i18n-key-usage";
+import { checkMessageUsage, createReport, loadConfig } from "i18n-key-usage";
 
 const { options, keyFiles } = loadConfig(process.cwd());
 const report = createReport(checkMessageUsage(options), keyFiles);

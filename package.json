@@ -1,5 +1,5 @@
 {
-  "name": "@saasykits/i18n-key-usage",
+  "name": "i18n-key-usage",
   "version": "0.1.0",
   "description": "Find unused, missing and unresolved i18n message keys in TypeScript projects. Follows keys across modules, types and helpers; fast oxc parser.",
   "keywords": [
