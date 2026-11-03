@@ -1,52 +1,48 @@
 import { checkMessageUsage } from "../src/analyzer/check";
-import type {
-	IUsageOptions,
-	IUsageResult,
-	IUsageSource,
-} from "../src/analyzer/types";
+import type { IUsageOptions, IUsageResult, IUsageSource } from "../src/analyzer/types";
 
 const ROOT = "/project";
 const TYPES: IUsageSource = {
-	file: "src/i18n/i18n.types.ts",
-	code: "export type TMessageKey = string; export interface IMessageRef { key: TMessageKey }",
+  file: "src/i18n/i18n.types.ts",
+  code: "export type TMessageKey = string; export interface IMessageRef { key: TMessageKey }",
 };
 const TRANSLATOR: IUsageSource = {
-	file: "src/i18n/translate.ts",
-	code: 'import type { TMessageKey } from "./i18n.types"; export interface ITranslator { (key: TMessageKey): string }',
+  file: "src/i18n/translate.ts",
+  code: 'import type { TMessageKey } from "./i18n.types"; export interface ITranslator { (key: TMessageKey): string }',
 };
 
 function check(
-	code: string,
-	keys: string[],
-	sources: IUsageSource[] = [],
-	options: Partial<IUsageOptions> = {},
+  code: string,
+  keys: string[],
+  sources: IUsageSource[] = [],
+  options: Partial<IUsageOptions> = {},
 ): IUsageResult {
-	return checkMessageUsage({
-		root: ROOT,
-		keys,
-		sources: [TYPES, TRANSLATOR, { file: "src/example.tsx", code }, ...sources],
-		...options,
-	});
+  return checkMessageUsage({
+    root: ROOT,
+    keys,
+    sources: [TYPES, TRANSLATOR, { file: "src/example.tsx", code }, ...sources],
+    ...options,
+  });
 }
 
 function expectClean(result: IUsageResult) {
-	expect({
-		unused: result.unused,
-		missing: result.missing,
-		unresolved: result.unresolved,
-		invalidDeclarations: result.invalidDeclarations,
-	}).toEqual({
-		unused: [],
-		missing: [],
-		unresolved: [],
-		invalidDeclarations: [],
-	});
+  expect({
+    unused: result.unused,
+    missing: result.missing,
+    unresolved: result.unresolved,
+    invalidDeclarations: result.invalidDeclarations,
+  }).toEqual({
+    unused: [],
+    missing: [],
+    unresolved: [],
+    invalidDeclarations: [],
+  });
 }
 
 describe("message usage", () => {
-	it("I18N-7: resolves namespaces, aliases, rich text and optional messages", () => {
-		const result = check(
-			`
+  it("I18N-7: resolves namespaces, aliases, rich text and optional messages", () => {
+    const result = check(
+      `
       import { useTranslations as useText } from 'next-intl';
       export function Screen() {
         const text = useText('common.actions');
@@ -54,45 +50,41 @@ describe("message usage", () => {
         return [alias('save'), text.rich('cancel', {}), text.has('optional')];
       }
     `,
-			[
-				"common.actions.save",
-				"common.actions.cancel",
-				"common.actions.optional",
-				"common.actions.unused",
-			],
-		);
-		expect(result.unused).toEqual(["common.actions.unused"]);
-		expect([...result.used].sort()).toEqual([
-			"common.actions.cancel",
-			"common.actions.optional",
-			"common.actions.save",
-		]);
-		expect(result.unresolved).toEqual([]);
-	});
+      [
+        "common.actions.save",
+        "common.actions.cancel",
+        "common.actions.optional",
+        "common.actions.unused",
+      ],
+    );
+    expect(result.unused).toEqual(["common.actions.unused"]);
+    expect([...result.used].sort()).toEqual([
+      "common.actions.cancel",
+      "common.actions.optional",
+      "common.actions.save",
+    ]);
+    expect(result.unresolved).toEqual([]);
+  });
 
-	it("I18N-7: handles Promise.all and inline awaited factories", () => {
-		expectClean(
-			check(
-				`
+  it("I18N-7: handles Promise.all and inline awaited factories", () => {
+    expectClean(
+      check(
+        `
       import { getTranslations } from 'next-intl/server';
       export async function Screen() {
         const [data, t, root] = await Promise.all([load(), getTranslations('cashbook'), getTranslations()]);
         return [t('title'), root('common.empty'), (await getTranslations('cashbook.presentation'))('transferDescription')];
       }
     `,
-				[
-					"cashbook.title",
-					"common.empty",
-					"cashbook.presentation.transferDescription",
-				],
-			),
-		);
-	});
+        ["cashbook.title", "common.empty", "cashbook.presentation.transferDescription"],
+      ),
+    );
+  });
 
-	it("I18N-7: follows imported maps and hook-returned translators", () => {
-		expectClean(
-			check(
-				`
+  it("I18N-7: follows imported maps and hook-returned translators", () => {
+    expectClean(
+      check(
+        `
       import { useScreen } from './screen.hooks';
       import { LABELS } from './labels';
       export function Screen({status}) {
@@ -100,25 +92,25 @@ describe("message usage", () => {
         return text(LABELS[status]);
       }
     `,
-				["common.active", "common.archived"],
-				[
-					{
-						file: "src/screen.hooks.ts",
-						code: "import { useTranslations } from 'next-intl'; export function useScreen() { const t = useTranslations(); return { t }; }",
-					},
-					{
-						file: "src/labels.ts",
-						code: "export const LABELS = { active: 'common.active', archived: 'common.archived' } as const;",
-					},
-				],
-			),
-		);
-	});
+        ["common.active", "common.archived"],
+        [
+          {
+            file: "src/screen.hooks.ts",
+            code: "import { useTranslations } from 'next-intl'; export function useScreen() { const t = useTranslations(); return { t }; }",
+          },
+          {
+            file: "src/labels.ts",
+            code: "export const LABELS = { active: 'common.active', archived: 'common.archived' } as const;",
+          },
+        ],
+      ),
+    );
+  });
 
-	it("I18N-7: resolves finite dynamic namespaces from imported configuration", () => {
-		expectClean(
-			check(
-				`
+  it("I18N-7: resolves finite dynamic namespaces from imported configuration", () => {
+    expectClean(
+      check(
+        `
       import { useTranslations } from 'next-intl';
       import { TARGETS } from './targets';
       export function Screen({kind}) {
@@ -127,33 +119,33 @@ describe("message usage", () => {
         return t('submit');
       }
     `,
-				["sales.deliver.submit", "sales.return.submit"],
-				[
-					{
-						file: "src/targets.ts",
-						code: "export const TARGETS = { delivery: { namespace: 'sales.deliver' }, return: { namespace: 'sales.return' } } as const;",
-					},
-				],
-			),
-		);
-	});
+        ["sales.deliver.submit", "sales.return.submit"],
+        [
+          {
+            file: "src/targets.ts",
+            code: "export const TARGETS = { delivery: { namespace: 'sales.deliver' }, return: { namespace: 'sales.return' } } as const;",
+          },
+        ],
+      ),
+    );
+  });
 
-	it("I18N-7: follows destructured translator parameters through interface types", () => {
-		expectClean(
-			check(
-				`
+  it("I18N-7: follows destructured translator parameters through interface types", () => {
+    expectClean(
+      check(
+        `
       import type { ITranslator } from './i18n/translate';
       interface IProps { t: ITranslator }
       export function rows({ t }: IProps) { return t('common.empty'); }
     `,
-				["common.empty"],
-			),
-		);
-	});
+        ["common.empty"],
+      ),
+    );
+  });
 
-	it("I18N-7: collects typed message producers without counting the entire key type", () => {
-		const result = check(
-			`
+  it("I18N-7: collects typed message producers without counting the entire key type", () => {
+    const result = check(
+      `
       import type { TMessageKey } from './i18n/i18n.types';
       import type { ITranslator } from './i18n/translate';
       const LABELS = { save: 'common.save' } satisfies Record<string, TMessageKey>;
@@ -162,134 +154,130 @@ describe("message usage", () => {
       fail('errors.forbidden');
       const unrelated = 'common.unused';
     `,
-			["common.save", "errors.forbidden", "common.unused"],
-		);
-		expect(result.unused).toEqual(["common.unused"]);
-		expect(result.unresolved).toEqual([]);
-	});
+      ["common.save", "errors.forbidden", "common.unused"],
+    );
+    expect(result.unused).toEqual(["common.unused"]);
+    expect(result.unresolved).toEqual([]);
+  });
 
-	it("I18N-7: expands enum templates in typed server error producers", () => {
-		expectClean(
-			check(
-				`
+  it("I18N-7: expands enum templates in typed server error producers", () => {
+    expectClean(
+      check(
+        `
       import type { TMessageKey } from './i18n/i18n.types';
       import { EEntity } from './entities';
       function fail(key: TMessageKey) { throw new Error(key); }
       function missing(entity: EEntity) { fail(\`errors.notFound.\${entity}\`); }
     `,
-				["errors.notFound.customer", "errors.notFound.product"],
-				[
-					{
-						file: "src/entities.ts",
-						code: "export enum EEntity { Customer = 'customer', Product = 'product' }",
-					},
-				],
-			),
-		);
-	});
+        ["errors.notFound.customer", "errors.notFound.product"],
+        [
+          {
+            file: "src/entities.ts",
+            code: "export enum EEntity { Customer = 'customer', Product = 'product' }",
+          },
+        ],
+      ),
+    );
+  });
 
-	it("I18N-7: excludes test, fixture, generated and catalog-only references", () => {
-		const result = check(
-			"import messages from '../messages/en'; const unrelated = 'common.unused';",
-			["common.unused"],
-			[
-				{
-					file: "src/example.test.ts",
-					code: "import { useTranslations } from 'next-intl'; const t = useTranslations(); t('common.unused');",
-				},
-				{
-					file: "src/__fixtures__/example.ts",
-					code: "throw new Error('errors.fake');",
-				},
-				{
-					file: "src/server/testing/example.ts",
-					code: "throw new Error('errors.fake');",
-				},
-				{
-					file: "src/seed.generated.ts",
-					code: "throw new Error('errors.fake');",
-				},
-			],
-		);
-		expect(result.unused).toEqual(["common.unused"]);
-		expect(result.missing).toEqual([]);
-	});
+  it("I18N-7: excludes test, fixture, generated and catalog-only references", () => {
+    const result = check(
+      "import messages from '../messages/en'; const unrelated = 'common.unused';",
+      ["common.unused"],
+      [
+        {
+          file: "src/example.test.ts",
+          code: "import { useTranslations } from 'next-intl'; const t = useTranslations(); t('common.unused');",
+        },
+        {
+          file: "src/__fixtures__/example.ts",
+          code: "throw new Error('errors.fake');",
+        },
+        {
+          file: "src/server/testing/example.ts",
+          code: "throw new Error('errors.fake');",
+        },
+        {
+          file: "src/seed.generated.ts",
+          code: "throw new Error('errors.fake');",
+        },
+      ],
+    );
+    expect(result.unused).toEqual(["common.unused"]);
+    expect(result.missing).toEqual([]);
+  });
 
-	it("I18N-7: reports missing keys and unresolved runtime keys", () => {
-		const result = check(
-			`
+  it("I18N-7: reports missing keys and unresolved runtime keys", () => {
+    const result = check(
+      `
       import { useTranslations } from 'next-intl';
       export function Screen({ key }) { const t = useTranslations('common'); return [t('missing'), t(key)]; }
     `,
-			["common.unused"],
-		);
-		expect(result.missing).toEqual([
-			expect.objectContaining({
-				file: "src/example.tsx",
-				message: "Unknown message key: common.missing",
-			}),
-		]);
-		expect(result.unresolved).toEqual([
-			expect.objectContaining({
-				message: "Cannot resolve dynamic message key: common.*",
-			}),
-		]);
-		expect(result.unused).toEqual(["common.unused"]);
-	});
+      ["common.unused"],
+    );
+    expect(result.missing).toEqual([
+      expect.objectContaining({
+        file: "src/example.tsx",
+        message: "Unknown message key: common.missing",
+      }),
+    ]);
+    expect(result.unresolved).toEqual([
+      expect.objectContaining({
+        message: "Cannot resolve dynamic message key: common.*",
+      }),
+    ]);
+    expect(result.unused).toEqual(["common.unused"]);
+  });
 
-	it("I18N-7: expands declared enum families without exempting an entire namespace", () => {
-		const result = check(
-			`
+  it("I18N-7: expands declared enum families without exempting an entire namespace", () => {
+    const result = check(
+      `
       import { useTranslations } from 'next-intl';
       export function Screen({ status }) { const t = useTranslations('common'); return t(\`status.\${status}\`); }
     `,
-			[
-				"common.status.active",
-				"common.status.archived",
-				"common.status.unused",
-			],
-			[
-				{
-					file: "src/status.ts",
-					code: "export enum EStatus { Active = 'active', Archived = 'archived' }",
-				},
-			],
-			{
-				families: [
-					{
-						pattern: "common.status.*",
-						source: "src/status.ts",
-						export: "EStatus",
-						reason: "The status comes from the procedure's enum field.",
-					},
-				],
-			},
-		);
-		expect(result.unused).toEqual(["common.status.unused"]);
-		expect(result.unresolved).toEqual([]);
-	});
+      ["common.status.active", "common.status.archived", "common.status.unused"],
+      [
+        {
+          file: "src/status.ts",
+          code: "export enum EStatus { Active = 'active', Archived = 'archived' }",
+        },
+      ],
+      {
+        families: [
+          {
+            pattern: "common.status.*",
+            source: "src/status.ts",
+            export: "EStatus",
+            reason: "The status comes from the procedure's enum field.",
+          },
+        ],
+      },
+    );
+    expect(result.unused).toEqual(["common.status.unused"]);
+    expect(result.unresolved).toEqual([]);
+  });
 
-	it("I18N-7: rejects stale family and retained-key declarations", () => {
-		const result = check("", ["common.old"], [], {
-			retained: [
-				{ key: "common.old", reason: "" },
-				{ key: "common.missing", reason: "Historical data" },
-			],
-			families: [
-				{
-					pattern: "common.status.*",
-					source: "src/status.ts",
-					export: "EStatus",
-					reason: "Runtime status",
-				},
-			],
-		});
-		expect(result.invalidDeclarations).toHaveLength(3);
-	});
+  it("I18N-7: rejects stale family and retained-key declarations", () => {
+    const result = check("", ["common.old"], [], {
+      retained: [
+        { key: "common.old", reason: "" },
+        { key: "common.missing", reason: "Historical data" },
+      ],
+      families: [
+        {
+          pattern: "common.status.*",
+          source: "src/status.ts",
+          export: "EStatus",
+          reason: "Runtime status",
+        },
+      ],
+    });
+    expect(result.invalidDeclarations).toHaveLength(3);
+  });
 
-	it("I18N-7: counts explicit catalog reads and raw objects without counting provider imports", () => {
-		const result = check(
-			`
+  it("I18N-7: counts explicit catalog reads and raw objects without counting provider imports", () => {
+    const result = check(
+      `
       import messages from '../messages/en';
       import { useTranslations } from 'next-intl';
       const provider = { messages };
@@ -297,26 +285,21 @@ describe("message usage", () => {
       const t = useTranslations('common');
       t.raw('options');
     `,
-			[
-				"meta.title",
-				"common.options.save",
-				"common.options.cancel",
-				"common.unused",
-			],
-		);
-		expect([...result.used].sort()).toEqual([
-			"common.options.cancel",
-			"common.options.save",
-			"meta.title",
-		]);
-		expect(result.unused).toEqual(["common.unused"]);
-		expect(result.missing).toEqual([]);
-	});
+      ["meta.title", "common.options.save", "common.options.cancel", "common.unused"],
+    );
+    expect([...result.used].sort()).toEqual([
+      "common.options.cancel",
+      "common.options.save",
+      "meta.title",
+    ]);
+    expect(result.unused).toEqual(["common.unused"]);
+    expect(result.missing).toEqual([]);
+  });
 
-	it("I18N-7: follows nullable maps, array spreads and Array.from callbacks", () => {
-		expectClean(
-			check(
-				`
+  it("I18N-7: follows nullable maps, array spreads and Array.from callbacks", () => {
+    expectClean(
+      check(
+        `
       import { useTranslations } from 'next-intl';
       import type { TMessageKey } from './i18n/i18n.types';
       const BASE = [{ label: 'save' }, { label: 'cancel' }] as const;
@@ -329,15 +312,15 @@ describe("message usage", () => {
         return [Array.from(new Set(labels), key => t(key)), root(NOTICE[status])];
       }
     `,
-				["common.save", "common.cancel", "common.ready"],
-			),
-		);
-	});
+        ["common.save", "common.cancel", "common.ready"],
+      ),
+    );
+  });
 
-	it("I18N-7: respects literal branch narrowing when building keys", () => {
-		expectClean(
-			check(
-				`
+  it("I18N-7: respects literal branch narrowing when building keys", () => {
+    expectClean(
+      check(
+        `
       import { useTranslations } from 'next-intl';
       const FIELDS = ['name', 'quantity'] as const;
       export function Screen() {
@@ -345,47 +328,45 @@ describe("message usage", () => {
         return FIELDS.map(field => field === 'quantity' ? t('quantityHint') : t(\`\${field}Description\`));
       }
     `,
-				["form.nameDescription", "form.quantityHint"],
-			),
-		);
-	});
+        ["form.nameDescription", "form.quantityHint"],
+      ),
+    );
+  });
 
-	it("I18N-7: ignores namespace prefixes used for error classification", () => {
-		const result = check(
-			"export const PREFIX = 'errors.insufficientCredits';",
-			["errors.insufficientCredits.default"],
-		);
-		expect(result.unused).toEqual(["errors.insufficientCredits.default"]);
-		expect(result.missing).toEqual([]);
-	});
+  it("I18N-7: ignores namespace prefixes used for error classification", () => {
+    const result = check("export const PREFIX = 'errors.insufficientCredits';", [
+      "errors.insufficientCredits.default",
+    ]);
+    expect(result.unused).toEqual(["errors.insufficientCredits.default"]);
+    expect(result.missing).toEqual([]);
+  });
 
-	it("I18N-7: does not confuse an unrelated shadowed function with a translator", () => {
-		const result = check(
-			`function t(value: string) { return value; } t('common.unused');`,
-			["common.unused"],
-		);
-		expect(result.unused).toEqual(["common.unused"]);
-		expect(result.missing).toEqual([]);
-	});
+  it("I18N-7: does not confuse an unrelated shadowed function with a translator", () => {
+    const result = check(`function t(value: string) { return value; } t('common.unused');`, [
+      "common.unused",
+    ]);
+    expect(result.unused).toEqual(["common.unused"]);
+    expect(result.missing).toEqual([]);
+  });
 
-	it("I18N-7: recognizes nested message references returned by helper functions", () => {
-		expectClean(
-			check(
-				`
+  it("I18N-7: recognizes nested message references returned by helper functions", () => {
+    expectClean(
+      check(
+        `
       import type { IMessageRef } from './i18n/i18n.types';
       export function hint(whole: boolean): IMessageRef {
         return whole ? { key: 'price.whole' } : { key: 'price.decimals' };
       }
     `,
-				["price.whole", "price.decimals"],
-			),
-		);
-	});
+        ["price.whole", "price.decimals"],
+      ),
+    );
+  });
 
-	it("I18N-7: collects Zod errors and action-state validation messages", () => {
-		expectClean(
-			check(
-				`
+  it("I18N-7: collects Zod errors and action-state validation messages", () => {
+    expectClean(
+      check(
+        `
       import { z as schema } from 'zod';
       const form = schema.object({
         password: schema.string().min(1, 'auth.required'),
@@ -393,58 +374,58 @@ describe("message usage", () => {
       });
       export const state = { message: 'account.mismatch' };
     `,
-				["auth.required", "form.reasonRequired", "account.mismatch"],
-			),
-		);
-	});
+        ["auth.required", "form.reasonRequired", "account.mismatch"],
+      ),
+    );
+  });
 
-	it("I18N-7: follows type and value re-exports through index files", () => {
-		expectClean(
-			check(
-				`
+  it("I18N-7: follows type and value re-exports through index files", () => {
+    expectClean(
+      check(
+        `
       import { LABELS } from './labels';
       import type { IContext } from './context';
       export function render({ t }: IContext, status: string) { return t(LABELS[status]); }
     `,
-				["common.ready"],
-				[
-					{
-						file: "src/labels/index.ts",
-						code: "export { LABELS } from './labels';",
-					},
-					{
-						file: "src/labels/labels.ts",
-						code: "export const LABELS = { ready: 'common.ready' } as const;",
-					},
-					{
-						file: "src/context/index.ts",
-						code: "export type { IContext } from './context';",
-					},
-					{
-						file: "src/context/context.ts",
-						code: "import type { ITranslator } from '../i18n/translate'; export interface IContext { t: ITranslator }",
-					},
-				],
-			),
-		);
-	});
+        ["common.ready"],
+        [
+          {
+            file: "src/labels/index.ts",
+            code: "export { LABELS } from './labels';",
+          },
+          {
+            file: "src/labels/labels.ts",
+            code: "export const LABELS = { ready: 'common.ready' } as const;",
+          },
+          {
+            file: "src/context/index.ts",
+            code: "export type { IContext } from './context';",
+          },
+          {
+            file: "src/context/context.ts",
+            code: "import type { ITranslator } from '../i18n/translate'; export interface IContext { t: ITranslator }",
+          },
+        ],
+      ),
+    );
+  });
 
-	it("I18N-7: supports translators created with locale and messages options", () => {
-		expectClean(
-			check(
-				`
+  it("I18N-7: supports translators created with locale and messages options", () => {
+    expectClean(
+      check(
+        `
       import { createTranslator } from 'next-intl';
       const t = createTranslator({ locale: 'en', messages: {} });
       t('emails.subject');
     `,
-				["emails.subject"],
-			),
-		);
-	});
+        ["emails.subject"],
+      ),
+    );
+  });
 
-	it("I18N-7: collects message references inserted into typed arrays", () => {
-		const result = check(
-			`
+  it("I18N-7: collects message references inserted into typed arrays", () => {
+    const result = check(
+      `
       import type { IMessageRef } from './i18n/i18n.types';
       const notes: IMessageRef[] = [];
       const alias = notes;
@@ -456,23 +437,23 @@ describe("message usage", () => {
       const unrelated = [];
       unrelated.push({ key: 'notes.unused' });
     `,
-			[
-				"notes.disabled",
-				"notes.former",
-				"notes.pushed",
-				"notes.replaced",
-				"notes.spread",
-				"notes.unused",
-			],
-		);
-		expect(result.unused).toEqual(["notes.unused"]);
-		expect(result.missing).toEqual([]);
-		expect(result.unresolved).toEqual([]);
-	});
+      [
+        "notes.disabled",
+        "notes.former",
+        "notes.pushed",
+        "notes.replaced",
+        "notes.spread",
+        "notes.unused",
+      ],
+    );
+    expect(result.unused).toEqual(["notes.unused"]);
+    expect(result.missing).toEqual([]);
+    expect(result.unresolved).toEqual([]);
+  });
 
-	it("I18N-7: collects typed React state initializers, setters and updater returns", () => {
-		const result = check(
-			`
+  it("I18N-7: collects typed React state initializers, setters and updater returns", () => {
+    const result = check(
+      `
       import { useState as useValue } from 'react';
       import type { IMessageRef } from './i18n/i18n.types';
       function Screen() {
@@ -485,22 +466,16 @@ describe("message usage", () => {
         setOther({ key: 'chat.unused' });
       }
     `,
-			[
-				"chat.initial",
-				"chat.reading",
-				"chat.running",
-				"chat.ready",
-				"chat.unused",
-			],
-		);
-		expect(result.unused).toEqual(["chat.unused"]);
-		expect(result.missing).toEqual([]);
-		expect(result.unresolved).toEqual([]);
-	});
+      ["chat.initial", "chat.reading", "chat.running", "chat.ready", "chat.unused"],
+    );
+    expect(result.unused).toEqual(["chat.unused"]);
+    expect(result.missing).toEqual([]);
+    expect(result.unresolved).toEqual([]);
+  });
 
-	it("I18N-7: follows inferred async method and callback return types", () => {
-		const result = check(
-			`
+  it("I18N-7: follows inferred async method and callback return types", () => {
+    const result = check(
+      `
       import type { IAction } from './actions';
       const action: IAction = {
         async currentState(ctx) { return [{ label: { key: 'summary.current' } }]; },
@@ -509,11 +484,11 @@ describe("message usage", () => {
       };
       const unrelated = { async currentState() { return { key: 'summary.unused' }; } };
     `,
-			["summary.current", "summary.title", "summary.unused"],
-			[
-				{
-					file: "src/actions.ts",
-					code: `
+      ["summary.current", "summary.title", "summary.unused"],
+      [
+        {
+          file: "src/actions.ts",
+          code: `
         import type { IMessageRef } from './i18n/i18n.types';
         export interface IAction {
           currentState(ctx: unknown): Promise<{ label: IMessageRef }[]>;
@@ -521,17 +496,17 @@ describe("message usage", () => {
           unrelated(): Promise<{ key: string }>;
         }
       `,
-				},
-			],
-		);
-		expect(result.unused).toEqual(["summary.unused"]);
-		expect(result.missing).toEqual([]);
-		expect(result.unresolved).toEqual([]);
-	});
+        },
+      ],
+    );
+    expect(result.unused).toEqual(["summary.unused"]);
+    expect(result.missing).toEqual([]);
+    expect(result.unresolved).toEqual([]);
+  });
 
-	it("I18N-7: reports missing keys in indirect typed producers", () => {
-		const result = check(
-			`
+  it("I18N-7: reports missing keys in indirect typed producers", () => {
+    const result = check(
+      `
       import { useState } from 'react';
       import type { IMessageRef } from './i18n/i18n.types';
       const notes: IMessageRef[] = [];
@@ -541,19 +516,19 @@ describe("message usage", () => {
       interface IAction { currentState(): Promise<IMessageRef> }
       const action: IAction = { async currentState() { return { key: 'summary.missing' }; } };
     `,
-			[],
-		);
-		expect(result.missing.map(({ message }) => message).sort()).toEqual([
-			"Unknown message key: chat.missing",
-			"Unknown message key: notes.missing",
-			"Unknown message key: summary.missing",
-		]);
-		expect(result.unresolved).toEqual([]);
-	});
+      [],
+    );
+    expect(result.missing.map(({ message }) => message).sort()).toEqual([
+      "Unknown message key: chat.missing",
+      "Unknown message key: notes.missing",
+      "Unknown message key: summary.missing",
+    ]);
+    expect(result.unresolved).toEqual([]);
+  });
 
-	it("I18N-7: reports unresolved keys in indirect typed producers", () => {
-		const result = check(
-			`
+  it("I18N-7: reports unresolved keys in indirect typed producers", () => {
+    const result = check(
+      `
       import { useState } from 'react';
       import type { IMessageRef } from './i18n/i18n.types';
       const notes: IMessageRef[] = [];
@@ -563,19 +538,19 @@ describe("message usage", () => {
       interface IAction { currentState(): Promise<IMessageRef> }
       const action: IAction = { async currentState() { return { key: runtimeSummary }; } };
     `,
-			[],
-		);
-		expect(result.missing).toEqual([]);
-		expect(result.unresolved.map(({ message }) => message)).toEqual([
-			"Cannot resolve dynamic message key: *",
-			"Cannot resolve dynamic message key: *",
-			"Cannot resolve dynamic message key: *",
-		]);
-	});
+      [],
+    );
+    expect(result.missing).toEqual([]);
+    expect(result.unresolved.map(({ message }) => message)).toEqual([
+      "Cannot resolve dynamic message key: *",
+      "Cannot resolve dynamic message key: *",
+      "Cannot resolve dynamic message key: *",
+    ]);
+  });
 
-	it("I18N-7: keeps excluded label-map entries unused after branch narrowing", () => {
-		const result = check(
-			`
+  it("I18N-7: keeps excluded label-map entries unused after branch narrowing", () => {
+    const result = check(
+      `
       import { useTranslations } from 'next-intl';
       const LABELS = { all: 'products.all', low: 'products.low' } as const;
       function Screen(kind: 'all' | 'low') {
@@ -584,18 +559,18 @@ describe("message usage", () => {
         return t(LABELS[kind]);
       }
     `,
-			["products.all", "products.low"],
-		);
-		expect(result.unused).toEqual(["products.all"]);
-		expect([...result.used]).toEqual(["products.low"]);
-		expect(result.missing).toEqual([]);
-		expect(result.unresolved).toEqual([]);
-	});
+      ["products.all", "products.low"],
+    );
+    expect(result.unused).toEqual(["products.all"]);
+    expect([...result.used]).toEqual(["products.low"]);
+    expect(result.missing).toEqual([]);
+    expect(result.unresolved).toEqual([]);
+  });
 
-	it("I18N-7: distinguishes callback closures and contextual return shapes", () => {
-		expectClean(
-			check(
-				`
+  it("I18N-7: distinguishes callback closures and contextual return shapes", () => {
+    expectClean(
+      check(
+        `
       import type { IMessageRef, TMessageKey } from './i18n/i18n.types';
       function build(key: string) { return () => ({ key }); }
       interface IAction { read(): IMessageRef }
@@ -605,15 +580,15 @@ describe("message usage", () => {
       const primary: { read(): { primary: TMessageKey } } = { read: labels };
       const secondary: { read(): { secondary: TMessageKey } } = { read: labels };
     `,
-				["labels.first", "labels.second", "labels.primary", "labels.secondary"],
-			),
-		);
-	});
+        ["labels.first", "labels.second", "labels.primary", "labels.secondary"],
+      ),
+    );
+  });
 
-	it("I18N-7: preserves typed message references through destructured map loops", () => {
-		expectClean(
-			check(
-				`
+  it("I18N-7: preserves typed message references through destructured map loops", () => {
+    expectClean(
+      check(
+        `
       import type { IMessageRef } from './i18n/i18n.types';
       interface IField { label: IMessageRef | { text: string } }
       const definition: IField = { label: { key: 'labels.notice' } };
@@ -622,8 +597,8 @@ describe("message usage", () => {
       const result: IField[] = [];
       for (const [field, { label }] of known) result.push({ label });
     `,
-				["labels.notice"],
-			),
-		);
-	});
+        ["labels.notice"],
+      ),
+    );
+  });
 });
