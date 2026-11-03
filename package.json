@@ -1,5 +1,5 @@
 {
-  "name": "i18n-key-usage",
+  "name": "@saasykits/i18n-key-usage",
   "version": "0.1.0",
   "description": "Find unused, missing and unresolved i18n message keys in TypeScript projects. Follows keys across modules, types and helpers; fast oxc parser.",
   "keywords": [
@@ -12,6 +12,14 @@
     "github-action",
     "oxc"
   ],
+  "homepage": "https://github.com/saasykits/i18n-key-usage#readme",
+  "bugs": {
+    "url": "https://github.com/saasykits/i18n-key-usage/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/saasykits/i18n-key-usage.git"
+  },
   "license": "MIT",
   "author": "Touha",
   "type": "module",
@@ -35,6 +43,10 @@
     "dist",
     "schema.json"
   ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
     "build": "tsdown",
     "schema": "tsx scripts/schema.ts",
@@ -60,10 +72,10 @@
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
   },
-  "packageManager": "pnpm@10.32.1",
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild"
     ]
-  }
+  },
+  "packageManager": "pnpm@10.32.1"
 }

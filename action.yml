@@ -43,7 +43,7 @@ runs:
             version="latest"
           fi
         fi
-        package="i18n-key-usage@$version"
+        package="@saasykits/i18n-key-usage@$version"
         if [[ "$version" == /* ]]; then package="$version"; fi
         set +e
         npx --yes --package "$package" i18n-key-usage --config "$INPUT_CONFIG" --format github
