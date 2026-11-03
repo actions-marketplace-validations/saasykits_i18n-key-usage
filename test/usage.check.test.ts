@@ -260,14 +260,7 @@ describe("message usage", () => {
         },
       ],
       {
-        families: [
-          {
-            pattern: "common.status.*",
-            source: "src/status.ts",
-            export: "EStatus",
-            reason: "The status comes from the procedure's enum field.",
-          },
-        ],
+        families: ["common.status.{{EStatus}}"],
       },
     );
     expect(result.unused).toEqual(["common.status.unused"]);
@@ -276,20 +269,15 @@ describe("message usage", () => {
 
   it("rejects stale family and retained-key declarations", () => {
     const result = check("", ["common.old"], [], {
-      retained: [
-        { key: "common.old", reason: "" },
-        { key: "common.missing", reason: "Historical data" },
-      ],
-      families: [
-        {
-          pattern: "common.status.*",
-          source: "src/status.ts",
-          export: "EStatus",
-          reason: "Runtime status",
-        },
-      ],
+      retained: ["common.missing", "common.old", "common.old"],
+      families: ["common.status.{{EStatus}}", "common.status.*"],
     });
-    expect(result.invalidDeclarations).toHaveLength(3);
+    expect(result.invalidDeclarations.sort()).toEqual([
+      "Invalid dynamic family declaration: common.status.* (use {{ExportName}} placeholders)",
+      "Invalid or stale retained key: common.missing",
+      "Invalid or stale retained key: common.old",
+      "Unused dynamic family declaration: common.status.{{EStatus}}",
+    ]);
   });
 
   it("counts explicit catalog reads and raw objects without counting provider imports", () => {
@@ -632,5 +620,46 @@ describe("message usage", () => {
       ["orders.status.open", "orders.status.closed", "orders.size.small", "orders.size.large"],
     );
     expectClean(result);
+  });
+  it("expands families with several placeholders from unions and constant arrays", () => {
+    const result = check(
+      `
+      import { useTranslations } from 'next-intl';
+      export function Cell({ region, status }) {
+        const t = useTranslations('orders');
+        return t(\`\${region}.\${status}\`);
+      }
+    `,
+      ["orders.eu.open", "orders.eu.closed", "orders.us.open", "orders.us.closed", "orders.title"],
+      [
+        { file: "src/regions.ts", code: "export const REGIONS = ['eu', 'us'] as const;" },
+        { file: "src/status.ts", code: "export type TStatus = 'open' | 'closed';" },
+      ],
+      { families: ["orders.{{REGIONS}}.{{TStatus}}"] },
+    );
+    expect(result.unused).toEqual(["orders.title"]);
+    expect(result.invalidDeclarations).toEqual([]);
+  });
+
+  it("asks for a file when several files export a family's name", () => {
+    const code = `
+      import { useTranslations } from 'next-intl';
+      export function Badge({ status }) { const t = useTranslations('common'); return t(\`status.\${status}\`); }
+    `;
+    const sources = [
+      { file: "src/a/status.ts", code: "export enum EStatus { Open = 'open' }" },
+      { file: "src/b/status.ts", code: "export enum EStatus { Closed = 'closed' }" },
+    ];
+    const ambiguous = check(code, ["common.status.open"], sources, {
+      families: ["common.status.{{EStatus}}"],
+    });
+    expect(ambiguous.invalidDeclarations).toEqual([
+      "Dynamic family common.status.{{EStatus}}: EStatus is exported by src/a/status.ts, src/b/status.ts; use {{file#EStatus}}",
+    ]);
+    const picked = check(code, ["common.status.open"], sources, {
+      families: ["common.status.{{src/a/status.ts#EStatus}}"],
+    });
+    expect(picked.unused).toEqual([]);
+    expect(picked.invalidDeclarations).toEqual([]);
   });
 });

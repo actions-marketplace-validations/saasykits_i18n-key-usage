@@ -65,18 +65,13 @@ export const configSchema = z
       .default([])
       .describe('Any string literal with one of these prefixes is a message key, e.g. "errors.".'),
     families: z
-      .array(
-        z.object({
-          pattern: z.string().describe("Key pattern with exactly one *, e.g. status.*"),
-          source: z.string().describe("File that exports the finite values."),
-          export: z.string().describe("Enum, object or union type that lists the values."),
-          reason: z.string().min(1).describe("Why the key is built at runtime."),
-        }),
-      )
+      .array(z.string().min(1))
       .default([])
-      .describe("Dynamic key families backed by a finite set of values in code."),
+      .describe(
+        "Dynamic key families, e.g. orders.status.{{EOrderStatus}}. Each {{Name}} expands to the values of an exported enum, object, array or string union; {{path/file.ts#Name}} picks one file.",
+      ),
     retained: z
-      .array(z.object({ key: z.string(), reason: z.string().min(1) }))
+      .array(z.string().min(1))
       .default([])
       .describe("Keys kept although no code references them, e.g. for historical data."),
   })
@@ -92,18 +87,36 @@ export interface ILoadedConfig {
 
 export class ConfigError extends Error {}
 
-export function loadConfig(root: string, file = CONFIG_FILE): ILoadedConfig {
-  const path = resolve(root, file);
-  if (!existsSync(path)) throw new ConfigError(`Config file not found: ${path}`);
-  let json: unknown;
-  try {
-    json = JSON.parse(readFileSync(path, "utf8"));
-  } catch (error) {
-    throw new ConfigError(`Invalid JSON in ${path}: ${(error as Error).message}`);
-  }
-  const parsed = configSchema.safeParse(json);
+export interface ILoadOptions {
+  /** Config file relative to the root. When omitted, the default file is used if it exists. */
+  file?: string;
+  /** Values that replace the file's, e.g. from CLI flags or environment variables. */
+  overrides?: Partial<Record<keyof TConfig, unknown>>;
+}
+
+export function loadConfig(root: string, options: ILoadOptions | string = {}): ILoadedConfig {
+  const { file, overrides = {} } = typeof options === "string" ? { file: options } : options;
+  const path = resolve(root, file ?? CONFIG_FILE);
+  let json: unknown = {};
+  if (existsSync(path)) {
+    try {
+      json = JSON.parse(readFileSync(path, "utf8"));
+    } catch (error) {
+      throw new ConfigError(`Invalid JSON in ${path}: ${(error as Error).message}`);
+    }
+  } else if (file !== undefined) throw new ConfigError(`Config file not found: ${path}`);
+  if (!json || typeof json !== "object" || Array.isArray(json))
+    throw new ConfigError(`Config ${path} must be a JSON object`);
+  const merged: Record<string, unknown> = { ...json };
+  for (const [key, value] of Object.entries(overrides))
+    if (value !== undefined) merged[key] = value;
+  if (merged.messages === undefined)
+    throw new ConfigError(
+      `No message catalog: set "messages" in ${CONFIG_FILE}, pass --messages or set I18N_KEY_USAGE_MESSAGES`,
+    );
+  const parsed = configSchema.safeParse(merged);
   if (!parsed.success)
-    throw new ConfigError(`Invalid config ${path}:\n${z.prettifyError(parsed.error)}`);
+    throw new ConfigError(`Invalid configuration:\n${z.prettifyError(parsed.error)}`);
   return resolveConfig(resolve(root), parsed.data);
 }
 

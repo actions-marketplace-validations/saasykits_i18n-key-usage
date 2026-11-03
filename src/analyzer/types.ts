@@ -96,18 +96,6 @@ export interface IUsageResult {
   files: number;
 }
 
-export interface IUsageFamily {
-  pattern: string;
-  source: string;
-  export: string;
-  reason: string;
-}
-
-export interface IRetainedMessage {
-  key: string;
-  reason: string;
-}
-
 /** An exported symbol, by file path relative to the project root and export name. */
 export interface ISymbolRef {
   file: string;
@@ -164,7 +152,13 @@ export interface IUsageOptions {
   validationLibraries?: string[];
   /** Any string literal with one of these prefixes is a message key, e.g. `"errors."`. */
   literalKeyPrefixes?: string[];
-  families?: IUsageFamily[];
-  retained?: IRetainedMessage[];
+  /**
+   * Dynamic key families such as `orders.status.{{EOrderStatus}}`. Each `{{Name}}` expands to the
+   * values of the exported enum, object, array or string union `Name`; `{{path/file.ts#Name}}`
+   * picks one export when several files share the name.
+   */
+  families?: string[];
+  /** Keys kept although no code references them. */
+  retained?: string[];
   onFile?: (file: string, index: number) => void;
 }

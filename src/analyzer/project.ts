@@ -37,6 +37,16 @@ export class UsageProject {
     }
   }
 
+  /** Scanned files that declare and export `name` themselves (re-exports are skipped). */
+  declaringFiles(name: string): string[] {
+    const word = new RegExp(`\\b${name.replace(/[$]/g, "\\$&")}\\b`);
+    return this.files.filter((file) => {
+      if (!word.test(this.source(file))) return false;
+      const module = this.module(file);
+      return module.declarations.has(name) && module.exports.has(name);
+    });
+  }
+
   /** Whether `file` declares `name` as one of `refs`. */
   matches(refs: ISymbolRef[] | undefined, file: string, name: string): boolean {
     const path = this.relative(file);

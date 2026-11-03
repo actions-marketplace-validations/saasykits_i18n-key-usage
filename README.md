@@ -63,15 +63,29 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-      - uses: saasykits/i18n-key-usage@v1
+      - uses: saasykits/i18n-key-usage@v0
         with:
-          config: i18n-key-usage.config.json # default
           working-directory: . # project root, e.g. apps/web in a monorepo
 ```
 
 Findings appear as annotations on the pull request and a table in the job summary. The action runs
-the npm release matching its tag (`@v1` runs the latest 1.x), so no install step is needed. Set
+the npm release matching its tag (`@v0` runs the latest 0.x), so no install step is needed. Set
 `version` to pin an exact release.
+
+Every [configuration](#configuration) option is also an input, in kebab-case, so a project can skip
+the config file or override it per workflow. Inputs replace the config file's value; lists take one
+item per line or comma-separated items:
+
+```yaml
+- uses: saasykits/i18n-key-usage@v0
+  with:
+    messages: messages/en
+    include: |
+      src/**/*.{ts,tsx}
+    key-types: src/i18n/types.ts#TMessageKey
+    families: |
+      orders.status.{{EOrderStatus}}
+```
 
 ## What it reports
 
@@ -87,7 +101,8 @@ count as usage.
 
 ## Configuration
 
-All paths are relative to the project root. Only `messages` is required. The full schema ships as
+All paths are relative to the project root. Only `messages` is required, and the config file itself
+is optional when options come from flags or environment variables. The full schema ships as
 [`schema.json`](schema.json).
 
 | Option                | Default                                                 | Description                                                                                                                                 |
@@ -105,30 +120,47 @@ All paths are relative to the project root. Only `messages` is required. The ful
 | `keyProperties`       | `[]`                                                    | Object properties whose string values are keys, e.g. `["labelKey", "titleKey"]`.                                                            |
 | `validationLibraries` | `[]`                                                    | Modules whose call arguments may be keys, e.g. `["zod"]` for `z.string().min(1, "errors.required")`.                                        |
 | `literalKeyPrefixes`  | `[]`                                                    | Any string literal with one of these prefixes is a key, e.g. `["errors."]` for error codes thrown on the server.                            |
-| `families`            | `[]`                                                    | Dynamic key families, see below.                                                                                                            |
-| `retained`            | `[]`                                                    | Keys to keep although nothing references them, each with a `reason`.                                                                        |
+| `families`            | `[]`                                                    | Dynamic key families such as `"orders.status.{{EOrderStatus}}"`, see below.                                                                 |
+| `retained`            | `[]`                                                    | Keys to keep although nothing references them, e.g. for historical data.                                                                    |
+
+### Flags and environment variables
+
+Every option can be set three ways. A flag replaces the
+environment variable, which replaces the config file:
+
+| Config file    | Flag                                        | Environment variable           |
+| -------------- | ------------------------------------------- | ------------------------------ |
+| `messages`     | `--messages messages/en`                    | `I18N_KEY_USAGE_MESSAGES`      |
+| `include`      | `--include 'src/**/*.{ts,tsx}'`             | `I18N_KEY_USAGE_INCLUDE`       |
+| `catalogs`     | `--catalog 'messages/*'`                    | `I18N_KEY_USAGE_CATALOGS`      |
+| `keyTypes`     | `--key-type src/i18n/types.ts#TMessageKey`  | `I18N_KEY_USAGE_KEY_TYPES`     |
+| `keyFunctions` | `--key-function src/i18n/t.ts#translate:1`  | `I18N_KEY_USAGE_KEY_FUNCTIONS` |
+| `families`     | `--family 'orders.status.{{EOrderStatus}}'` | `I18N_KEY_USAGE_FAMILIES`      |
+| `retained`     | `--retain legacy.title`                     | `I18N_KEY_USAGE_RETAINED`      |
+
+The rest follow the same scheme (`--exclude`, `--key-property`, `--literal-key-prefix`, …);
+`i18n-key-usage --help` lists them all. List flags repeat, and every list also accepts
+comma-separated or newline-separated values; commas inside glob braces such as `{ts,tsx}` are kept.
+Symbol references are written `file#export`, key functions `file#export:argument`.
+
+`--config`, `--root` and `--format` read `I18N_KEY_USAGE_CONFIG`, `I18N_KEY_USAGE_ROOT` and
+`I18N_KEY_USAGE_FORMAT`.
 
 ### Dynamic key families
 
-When keys are built at runtime from a finite set of values, declare the family and point at the
-code that lists the values:
+When keys are built at runtime from a finite set of values, declare the family with a placeholder
+naming the export that lists the values:
 
 ```json
 {
-  "families": [
-    {
-      "pattern": "orders.status.*",
-      "source": "src/orders/order-status.ts",
-      "export": "EOrderStatus",
-      "reason": "Order rows render the status enum."
-    }
-  ]
+  "families": ["orders.status.{{EOrderStatus}}", "orders.{{REGIONS}}.{{EOrderStatus}}"]
 }
 ```
 
-`export` can be an enum or a constant object; the family's keys are built from its values. Only those
-keys count as used, so a removed enum member makes its key unused. A family that no code matches
-anymore is reported as stale.
+A placeholder names an exported enum, constant object, constant array or string-literal union type
+in the scanned sources. If several files export the name, write `{{src/orders/status.ts#EOrderStatus}}`.
+Several placeholders expand to every combination. Only those keys count as used, so a removed enum
+member makes its key unused, and a family that no code matches anymore is reported as stale.
 
 Families are only needed when the analyzer cannot see the values. A template such as
 ``t(`status.${status}`)`` resolves on its own when `status` is typed as an enum or a union of string

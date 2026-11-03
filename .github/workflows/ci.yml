@@ -45,3 +45,15 @@ jobs:
           version: ${{ github.workspace }}
       - name: Fixture reports its unused and missing keys
         run: test "${{ steps.usage.outputs.exit-code }}" = "1"
+      - id: inputs
+        uses: ./
+        continue-on-error: true
+        with:
+          working-directory: test/fixtures/no-config
+          version: ${{ github.workspace }}
+          messages: messages/en.json
+          include: |
+            src/**/*.{ts,tsx}
+          retained: home.unused
+      - name: Inputs work without a config file
+        run: test "${{ steps.inputs.outputs.exit-code }}" = "1"

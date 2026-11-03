@@ -19,7 +19,7 @@ class UsageChecker {
   private readonly project: UsageProject;
   private readonly evaluator: UsageEvaluator;
   private readonly matchedFamilies = new Set<string>();
-  private readonly familyValues = new Map<string, string[]>();
+  private readonly familyKeys = new Map<string, string[]>();
   private readonly diagnostics = new Set<string>();
   private readonly checkedCallbacks = new Set<string>();
   private readonly result: IUsageResult = {
@@ -35,6 +35,8 @@ class UsageChecker {
   private readonly validationLibraries: Set<string>;
   private readonly literalKeys: RegExp | undefined;
 
+  private readonly families = new Map<string, IFamily>();
+
   constructor(private readonly options: IUsageOptions) {
     this.keyProperties = new Set(options.keyProperties);
     this.validationLibraries = new Set(options.validationLibraries);
@@ -43,6 +45,16 @@ class UsageChecker {
       ? new RegExp(`^(?:${prefixes.join("|")})[a-zA-Z0-9_.]+$`)
       : undefined;
     this.project = new UsageProject(options);
+    for (const declaration of options.families ?? []) {
+      const family = familyPattern(declaration);
+      if (!family || this.families.has(family.pattern))
+        this.result.invalidDeclarations.push(
+          family
+            ? `Duplicate dynamic family declaration: ${declaration}`
+            : `Invalid dynamic family declaration: ${declaration} (use {{ExportName}} placeholders)`,
+        );
+      else this.families.set(family.pattern, family);
+    }
     this.evaluator = new UsageEvaluator(this.project);
   }
 
@@ -75,27 +87,52 @@ class UsageChecker {
     this.diagnostic(path, context, `Unknown message key: ${key}`, true);
   }
 
+  /** Keys of the declared family whose `*` pattern equals `pattern`, if any. */
   private family(pattern: string): string[] | undefined {
-    const family = this.options.families?.find((item) => item.pattern === pattern);
+    const family = this.families.get(pattern);
     if (!family) return undefined;
-    this.matchedFamilies.add(pattern);
-    const cached = this.familyValues.get(pattern);
+    this.matchedFamilies.add(family.declaration);
+    const cached = this.familyKeys.get(pattern);
     if (cached) return cached;
-    if (!family.reason.trim() || (pattern.match(/\*/g) ?? []).length !== 1) {
-      this.result.invalidDeclarations.push(`Invalid dynamic family declaration: ${pattern}`);
+    let keys = [""];
+    family.segments.forEach((segment, index) => {
+      const values = index % 2 ? this.placeholderValues(family.declaration, segment) : [segment];
+      keys = keys.flatMap((prefix) => values.map((value) => prefix + value));
+    });
+    keys = [...new Set(keys)];
+    this.familyKeys.set(pattern, keys);
+    return keys;
+  }
+
+  /** Finite string values of the export named by a `{{Name}}` or `{{file#Name}}` placeholder. */
+  private placeholderValues(declaration: string, placeholder: string): string[] {
+    const [file, name] = placeholder.includes("#")
+      ? (placeholder.split("#", 2) as [string, string])
+      : [undefined, placeholder];
+    const files = file ? [file] : this.project.declaringFiles(name);
+    if (files.length !== 1) {
+      this.result.invalidDeclarations.push(
+        files.length
+          ? `Dynamic family ${declaration}: ${name} is exported by ${files.map((item) => this.project.relative(item)).join(", ")}; use {{file#${name}}}`
+          : `Dynamic family ${declaration}: no scanned file exports ${name}`,
+      );
       return [];
     }
-    const context = this.evaluator.context(family.source);
-    const declaration = context.module.exports.get(family.export);
-    const value = declaration ? this.evaluator.evaluate(declaration, context) : UNKNOWN;
-    const strings = this.evaluator.strings(this.evaluator.property(value, undefined));
+    const context = this.evaluator.context(files[0] ?? "");
+    const exported = context.module.exports.get(name);
+    const value = exported ? this.evaluator.evaluate(exported, context) : UNKNOWN;
+    const strings = this.evaluator
+      .alternatives(value)
+      .flatMap((item) =>
+        item.kind === EUsageValueKind.Object || item.kind === EUsageValueKind.Array
+          ? this.evaluator.strings(this.evaluator.property(item, undefined))
+          : this.evaluator.strings(item),
+      );
     if (!strings.length)
       this.result.invalidDeclarations.push(
-        `Dynamic family ${pattern} has no finite values in ${family.source}:${family.export}`,
+        `Dynamic family ${declaration}: ${placeholder} has no finite string values`,
       );
-    const keys = [...new Set(strings.map((value) => pattern.replace("*", value)))];
-    this.familyValues.set(pattern, keys);
-    return keys;
+    return strings;
   }
 
   private consume(
@@ -501,22 +538,15 @@ class UsageChecker {
       this.result.files += 1;
     }
     const retained = new Set<string>();
-    for (const entry of this.options.retained ?? []) {
-      if (
-        !entry.reason.trim() ||
-        !this.project.keys.has(entry.key) ||
-        this.result.used.has(entry.key) ||
-        retained.has(entry.key)
-      ) {
-        this.result.invalidDeclarations.push(`Invalid or stale retained key: ${entry.key}`);
-      }
-      retained.add(entry.key);
+    for (const key of this.options.retained ?? []) {
+      if (!this.project.keys.has(key) || this.result.used.has(key) || retained.has(key))
+        this.result.invalidDeclarations.push(`Invalid or stale retained key: ${key}`);
+      retained.add(key);
     }
     for (const family of this.options.families ?? []) {
-      if (!this.matchedFamilies.has(family.pattern))
-        this.result.invalidDeclarations.push(
-          `Unused dynamic family declaration: ${family.pattern}`,
-        );
+      if (this.families.get(familyPattern(family)?.pattern ?? "")?.declaration !== family) continue;
+      if (!this.matchedFamilies.has(family))
+        this.result.invalidDeclarations.push(`Unused dynamic family declaration: ${family}`);
     }
     this.result.unused = [...this.project.keys]
       .filter((key) => !this.result.used.has(key) && !retained.has(key))
@@ -527,6 +557,30 @@ class UsageChecker {
 
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+interface IFamily {
+  declaration: string;
+  /** `*` pattern matched against dynamic keys, e.g. `orders.status.*`. */
+  pattern: string;
+  /** Literal text and placeholders alternating, starting with text. */
+  segments: string[];
+}
+
+const PLACEHOLDER = /\{\{\s*([^{}]+?)\s*\}\}/g;
+
+function familyPattern(declaration: string): IFamily | undefined {
+  const segments = declaration.split(PLACEHOLDER);
+  if (
+    segments.length < 3 ||
+    segments.some((segment, index) => !(index % 2) && segment.includes("*"))
+  )
+    return undefined;
+  return {
+    declaration,
+    segments,
+    pattern: segments.map((segment, index) => (index % 2 ? "*" : segment)).join(""),
+  };
 }
 
 export function checkMessageUsage(options: IUsageOptions): IUsageResult {

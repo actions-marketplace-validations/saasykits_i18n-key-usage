@@ -1,6 +1,6 @@
 {
   "name": "i18n-key-usage",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Find unused, missing and unresolved i18n message keys in TypeScript projects. Follows keys across modules, types and helpers; fast oxc parser.",
   "keywords": [
     "i18n",

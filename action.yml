@@ -7,8 +7,8 @@ branding:
 
 inputs:
   config:
-    description: Config file, relative to working-directory.
-    default: i18n-key-usage.config.json
+    description: Config file, relative to working-directory. Optional when messages is set.
+    default: ""
   working-directory:
     description: Project root that contains the config and sources.
     default: .
@@ -17,6 +17,67 @@ inputs:
       Package version to run, or an absolute path to a local checkout. Defaults to the version
       matching the action ref (v1 runs the latest 1.x release); any other ref runs the latest
       release.
+    default: ""
+  # Config options. Each overrides the config file when set.
+  messages:
+    description: >-
+      Source-locale catalog: a JSON file or a directory of namespace files. Overrides the config file.
+    default: ""
+  library:
+    description: >-
+      i18n library (next-intl). Overrides the config file.
+    default: ""
+  tsconfig:
+    description: >-
+      tsconfig whose compilerOptions.paths resolve import aliases. Overrides the config file.
+    default: ""
+  include:
+    description: >-
+      Globs of sources to scan. Overrides the config file. Lists take one item per line or comma-separated items.
+    default: ""
+  exclude:
+    description: >-
+      Globs removed from include. Overrides the config file. Lists take one item per line or comma-separated items.
+    default: ""
+  catalogs:
+    description: >-
+      Globs of catalog files or directories. Overrides the config file. Lists take one item per line or comma-separated items.
+    default: ""
+  key-types:
+    description: >-
+      Types whose values are message keys, as file#export. Overrides the config file. Lists take one item per line or comma-separated items.
+    default: ""
+  translator-types:
+    description: >-
+      Types whose values are translators, as file#export. Overrides the config file. Lists take one item per line or comma-separated items.
+    default: ""
+  message-loaders:
+    description: >-
+      Functions that return the catalog, as file#export. Overrides the config file. Lists take one item per line or comma-separated items.
+    default: ""
+  key-functions:
+    description: >-
+      Functions whose argument is a key, as file#export:argument. Overrides the config file. Lists take one item per line or comma-separated items.
+    default: ""
+  key-properties:
+    description: >-
+      Object properties whose string values are keys. Overrides the config file. Lists take one item per line or comma-separated items.
+    default: ""
+  validation-libraries:
+    description: >-
+      Modules whose call arguments may be keys, e.g. zod. Overrides the config file. Lists take one item per line or comma-separated items.
+    default: ""
+  literal-key-prefixes:
+    description: >-
+      Prefixes that make any string literal a key, e.g. errors. Overrides the config file. Lists take one item per line or comma-separated items.
+    default: ""
+  families:
+    description: >-
+      Dynamic key families, e.g. orders.status.{{EOrderStatus}}. Overrides the config file. Lists take one item per line or comma-separated items.
+    default: ""
+  retained:
+    description: >-
+      Keys kept although nothing references them. Overrides the config file. Lists take one item per line or comma-separated items.
     default: ""
 
 outputs:
@@ -31,9 +92,24 @@ runs:
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
-        INPUT_CONFIG: ${{ inputs.config }}
         INPUT_VERSION: ${{ inputs.version }}
         ACTION_REF: ${{ github.action_ref }}
+        I18N_KEY_USAGE_CONFIG: ${{ inputs.config }}
+        I18N_KEY_USAGE_MESSAGES: ${{ inputs.messages }}
+        I18N_KEY_USAGE_LIBRARY: ${{ inputs.library }}
+        I18N_KEY_USAGE_TSCONFIG: ${{ inputs.tsconfig }}
+        I18N_KEY_USAGE_INCLUDE: ${{ inputs.include }}
+        I18N_KEY_USAGE_EXCLUDE: ${{ inputs.exclude }}
+        I18N_KEY_USAGE_CATALOGS: ${{ inputs.catalogs }}
+        I18N_KEY_USAGE_KEY_TYPES: ${{ inputs.key-types }}
+        I18N_KEY_USAGE_TRANSLATOR_TYPES: ${{ inputs.translator-types }}
+        I18N_KEY_USAGE_MESSAGE_LOADERS: ${{ inputs.message-loaders }}
+        I18N_KEY_USAGE_KEY_FUNCTIONS: ${{ inputs.key-functions }}
+        I18N_KEY_USAGE_KEY_PROPERTIES: ${{ inputs.key-properties }}
+        I18N_KEY_USAGE_VALIDATION_LIBRARIES: ${{ inputs.validation-libraries }}
+        I18N_KEY_USAGE_LITERAL_KEY_PREFIXES: ${{ inputs.literal-key-prefixes }}
+        I18N_KEY_USAGE_FAMILIES: ${{ inputs.families }}
+        I18N_KEY_USAGE_RETAINED: ${{ inputs.retained }}
       run: |
         version="$INPUT_VERSION"
         if [ -z "$version" ]; then
@@ -46,7 +122,7 @@ runs:
         package="i18n-key-usage@$version"
         if [[ "$version" == /* ]]; then package="$version"; fi
         set +e
-        npx --yes --package "$package" i18n-key-usage --config "$INPUT_CONFIG" --format github
+        npx --yes --package "$package" i18n-key-usage --format github
         code=$?
         set -e
         echo "exit-code=$code" >> "$GITHUB_OUTPUT"

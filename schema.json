@@ -188,35 +188,11 @@
     },
     "families": {
       "default": [],
-      "description": "Dynamic key families backed by a finite set of values in code.",
+      "description": "Dynamic key families, e.g. orders.status.{{EOrderStatus}}. Each {{Name}} expands to the values of an exported enum, object, array or string union; {{path/file.ts#Name}} picks one file.",
       "type": "array",
       "items": {
-        "type": "object",
-        "properties": {
-          "pattern": {
-            "type": "string",
-            "description": "Key pattern with exactly one *, e.g. status.*"
-          },
-          "source": {
-            "type": "string",
-            "description": "File that exports the finite values."
-          },
-          "export": {
-            "type": "string",
-            "description": "Enum, object or union type that lists the values."
-          },
-          "reason": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Why the key is built at runtime."
-          }
-        },
-        "required": [
-          "pattern",
-          "source",
-          "export",
-          "reason"
-        ]
+        "type": "string",
+        "minLength": 1
       }
     },
     "retained": {
@@ -224,20 +200,8 @@
       "description": "Keys kept although no code references them, e.g. for historical data.",
       "type": "array",
       "items": {
-        "type": "object",
-        "properties": {
-          "key": {
-            "type": "string"
-          },
-          "reason": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "required": [
-          "key",
-          "reason"
-        ]
+        "type": "string",
+        "minLength": 1
       }
     }
   },
