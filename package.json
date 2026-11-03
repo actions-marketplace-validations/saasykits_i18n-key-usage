@@ -46,7 +46,7 @@
   },
   "dependencies": {
     "get-tsconfig": "^4.14.3",
-    "oxc-parser": "0.157.0",
+    "oxc-parser": "0.155.0",
     "picomatch": "^4.0.7",
     "tinyglobby": "^0.2.17",
     "zod": "^4.6.7"
@@ -60,5 +60,10 @@
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
   },
-  "packageManager": "pnpm@10.32.1"
+  "packageManager": "pnpm@10.32.1",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
 }
