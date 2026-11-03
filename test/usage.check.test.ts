@@ -1,3 +1,4 @@
+import { NEXT_INTL_ADAPTER } from "../src/adapters/next-intl";
 import { checkMessageUsage } from "../src/analyzer/check";
 import type { IUsageOptions, IUsageResult, IUsageSource } from "../src/analyzer/types";
 
@@ -11,6 +12,22 @@ const TRANSLATOR: IUsageSource = {
   code: 'import type { TMessageKey } from "./i18n.types"; export interface ITranslator { (key: TMessageKey): string }',
 };
 
+/** A project laid out like the one the analyzer was extracted from. */
+const PROJECT: Omit<IUsageOptions, "keys"> = {
+  root: ROOT,
+  include: ["src/**/*.{ts,tsx}"],
+  paths: { "@/*": ["src/*"] },
+  catalogs: ["messages/en", "messages/bn"],
+  adapter: NEXT_INTL_ADAPTER,
+  keyTypes: [{ file: "src/i18n/i18n.types.ts", export: "TMessageKey" }],
+  translatorTypes: [{ file: "src/i18n/translate.ts", export: "ITranslator" }],
+  messageLoaders: [{ file: "src/i18n/messages.ts", export: "loadMessages" }],
+  keyFunctions: [{ file: "src/i18n/translate.ts", export: "translateMessage", argument: 1 }],
+  keyProperties: ["error", "message", "messageKey", "labelKey", "titleKey", "descriptionKey"],
+  validationLibraries: ["zod"],
+  literalKeyPrefixes: ["errors."],
+};
+
 function check(
   code: string,
   keys: string[],
@@ -18,7 +35,7 @@ function check(
   options: Partial<IUsageOptions> = {},
 ): IUsageResult {
   return checkMessageUsage({
-    root: ROOT,
+    ...PROJECT,
     keys,
     sources: [TYPES, TRANSLATOR, { file: "src/example.tsx", code }, ...sources],
     ...options,
@@ -40,7 +57,7 @@ function expectClean(result: IUsageResult) {
 }
 
 describe("message usage", () => {
-  it("I18N-7: resolves namespaces, aliases, rich text and optional messages", () => {
+  it("resolves namespaces, aliases, rich text and optional messages", () => {
     const result = check(
       `
       import { useTranslations as useText } from 'next-intl';
@@ -66,7 +83,7 @@ describe("message usage", () => {
     expect(result.unresolved).toEqual([]);
   });
 
-  it("I18N-7: handles Promise.all and inline awaited factories", () => {
+  it("handles Promise.all and inline awaited factories", () => {
     expectClean(
       check(
         `
@@ -81,7 +98,7 @@ describe("message usage", () => {
     );
   });
 
-  it("I18N-7: follows imported maps and hook-returned translators", () => {
+  it("follows imported maps and hook-returned translators", () => {
     expectClean(
       check(
         `
@@ -107,7 +124,7 @@ describe("message usage", () => {
     );
   });
 
-  it("I18N-7: resolves finite dynamic namespaces from imported configuration", () => {
+  it("resolves finite dynamic namespaces from imported configuration", () => {
     expectClean(
       check(
         `
@@ -130,7 +147,7 @@ describe("message usage", () => {
     );
   });
 
-  it("I18N-7: follows destructured translator parameters through interface types", () => {
+  it("follows destructured translator parameters through interface types", () => {
     expectClean(
       check(
         `
@@ -143,7 +160,7 @@ describe("message usage", () => {
     );
   });
 
-  it("I18N-7: collects typed message producers without counting the entire key type", () => {
+  it("collects typed message producers without counting the entire key type", () => {
     const result = check(
       `
       import type { TMessageKey } from './i18n/i18n.types';
@@ -160,7 +177,7 @@ describe("message usage", () => {
     expect(result.unresolved).toEqual([]);
   });
 
-  it("I18N-7: expands enum templates in typed server error producers", () => {
+  it("expands enum templates in typed server error producers", () => {
     expectClean(
       check(
         `
@@ -180,7 +197,7 @@ describe("message usage", () => {
     );
   });
 
-  it("I18N-7: excludes test, fixture, generated and catalog-only references", () => {
+  it("excludes test, fixture, generated and catalog-only references", () => {
     const result = check(
       "import messages from '../messages/en'; const unrelated = 'common.unused';",
       ["common.unused"],
@@ -207,7 +224,7 @@ describe("message usage", () => {
     expect(result.missing).toEqual([]);
   });
 
-  it("I18N-7: reports missing keys and unresolved runtime keys", () => {
+  it("reports missing keys and unresolved runtime keys", () => {
     const result = check(
       `
       import { useTranslations } from 'next-intl';
@@ -229,7 +246,7 @@ describe("message usage", () => {
     expect(result.unused).toEqual(["common.unused"]);
   });
 
-  it("I18N-7: expands declared enum families without exempting an entire namespace", () => {
+  it("expands declared enum families without exempting an entire namespace", () => {
     const result = check(
       `
       import { useTranslations } from 'next-intl';
@@ -257,7 +274,7 @@ describe("message usage", () => {
     expect(result.unresolved).toEqual([]);
   });
 
-  it("I18N-7: rejects stale family and retained-key declarations", () => {
+  it("rejects stale family and retained-key declarations", () => {
     const result = check("", ["common.old"], [], {
       retained: [
         { key: "common.old", reason: "" },
@@ -275,7 +292,7 @@ describe("message usage", () => {
     expect(result.invalidDeclarations).toHaveLength(3);
   });
 
-  it("I18N-7: counts explicit catalog reads and raw objects without counting provider imports", () => {
+  it("counts explicit catalog reads and raw objects without counting provider imports", () => {
     const result = check(
       `
       import messages from '../messages/en';
@@ -296,7 +313,7 @@ describe("message usage", () => {
     expect(result.missing).toEqual([]);
   });
 
-  it("I18N-7: follows nullable maps, array spreads and Array.from callbacks", () => {
+  it("follows nullable maps, array spreads and Array.from callbacks", () => {
     expectClean(
       check(
         `
@@ -317,7 +334,7 @@ describe("message usage", () => {
     );
   });
 
-  it("I18N-7: respects literal branch narrowing when building keys", () => {
+  it("respects literal branch narrowing when building keys", () => {
     expectClean(
       check(
         `
@@ -333,7 +350,7 @@ describe("message usage", () => {
     );
   });
 
-  it("I18N-7: ignores namespace prefixes used for error classification", () => {
+  it("ignores namespace prefixes used for error classification", () => {
     const result = check("export const PREFIX = 'errors.insufficientCredits';", [
       "errors.insufficientCredits.default",
     ]);
@@ -341,7 +358,7 @@ describe("message usage", () => {
     expect(result.missing).toEqual([]);
   });
 
-  it("I18N-7: does not confuse an unrelated shadowed function with a translator", () => {
+  it("does not confuse an unrelated shadowed function with a translator", () => {
     const result = check(`function t(value: string) { return value; } t('common.unused');`, [
       "common.unused",
     ]);
@@ -349,7 +366,7 @@ describe("message usage", () => {
     expect(result.missing).toEqual([]);
   });
 
-  it("I18N-7: recognizes nested message references returned by helper functions", () => {
+  it("recognizes nested message references returned by helper functions", () => {
     expectClean(
       check(
         `
@@ -363,7 +380,7 @@ describe("message usage", () => {
     );
   });
 
-  it("I18N-7: collects Zod errors and action-state validation messages", () => {
+  it("collects Zod errors and action-state validation messages", () => {
     expectClean(
       check(
         `
@@ -379,7 +396,7 @@ describe("message usage", () => {
     );
   });
 
-  it("I18N-7: follows type and value re-exports through index files", () => {
+  it("follows type and value re-exports through index files", () => {
     expectClean(
       check(
         `
@@ -410,7 +427,7 @@ describe("message usage", () => {
     );
   });
 
-  it("I18N-7: supports translators created with locale and messages options", () => {
+  it("supports translators created with locale and messages options", () => {
     expectClean(
       check(
         `
@@ -423,7 +440,7 @@ describe("message usage", () => {
     );
   });
 
-  it("I18N-7: collects message references inserted into typed arrays", () => {
+  it("collects message references inserted into typed arrays", () => {
     const result = check(
       `
       import type { IMessageRef } from './i18n/i18n.types';
@@ -451,7 +468,7 @@ describe("message usage", () => {
     expect(result.unresolved).toEqual([]);
   });
 
-  it("I18N-7: collects typed React state initializers, setters and updater returns", () => {
+  it("collects typed React state initializers, setters and updater returns", () => {
     const result = check(
       `
       import { useState as useValue } from 'react';
@@ -473,7 +490,7 @@ describe("message usage", () => {
     expect(result.unresolved).toEqual([]);
   });
 
-  it("I18N-7: follows inferred async method and callback return types", () => {
+  it("follows inferred async method and callback return types", () => {
     const result = check(
       `
       import type { IAction } from './actions';
@@ -504,7 +521,7 @@ describe("message usage", () => {
     expect(result.unresolved).toEqual([]);
   });
 
-  it("I18N-7: reports missing keys in indirect typed producers", () => {
+  it("reports missing keys in indirect typed producers", () => {
     const result = check(
       `
       import { useState } from 'react';
@@ -526,7 +543,7 @@ describe("message usage", () => {
     expect(result.unresolved).toEqual([]);
   });
 
-  it("I18N-7: reports unresolved keys in indirect typed producers", () => {
+  it("reports unresolved keys in indirect typed producers", () => {
     const result = check(
       `
       import { useState } from 'react';
@@ -548,7 +565,7 @@ describe("message usage", () => {
     ]);
   });
 
-  it("I18N-7: keeps excluded label-map entries unused after branch narrowing", () => {
+  it("keeps excluded label-map entries unused after branch narrowing", () => {
     const result = check(
       `
       import { useTranslations } from 'next-intl';
@@ -567,7 +584,7 @@ describe("message usage", () => {
     expect(result.unresolved).toEqual([]);
   });
 
-  it("I18N-7: distinguishes callback closures and contextual return shapes", () => {
+  it("distinguishes callback closures and contextual return shapes", () => {
     expectClean(
       check(
         `
@@ -585,7 +602,7 @@ describe("message usage", () => {
     );
   });
 
-  it("I18N-7: preserves typed message references through destructured map loops", () => {
+  it("preserves typed message references through destructured map loops", () => {
     expectClean(
       check(
         `

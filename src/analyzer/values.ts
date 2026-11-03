@@ -32,12 +32,3 @@ export function unionValue(values: TUsageValue[]): TUsageValue {
 export function patternText(parts: (string | null)[]): string {
   return parts.map((part) => part ?? "*").join("");
 }
-
-export function isProductionSource(file: string): boolean {
-  return (
-    /\.(?:ts|tsx)$/.test(file) &&
-    !/\.(?:test|spec|generated|d)\.tsx?$/.test(file) &&
-    !/(?:^|\/)(?:__tests__|__fixtures__|tests?|testing)(?:\/|$)/.test(file) &&
-    !file.startsWith("src/i18n/usage/")
-  );
-}

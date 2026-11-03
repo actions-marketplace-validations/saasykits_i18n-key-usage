@@ -72,8 +72,7 @@ export class UsageEvaluator {
       const parameters = child(path, "typeArguments");
       if (name.is("Identifier")) {
         if (
-          name.node.name === "TMessageKey" &&
-          this.project.relative(context.module.file) === "src/i18n/i18n.types.ts"
+          this.project.matches(this.project.options.keyTypes, context.module.file, name.node.name)
         )
           result = true;
         else if (
@@ -104,10 +103,7 @@ export class UsageEvaluator {
               declaration.node.source.value,
             );
             if (file) {
-              if (
-                this.project.relative(file) === "src/i18n/i18n.types.ts" &&
-                exported === "TMessageKey"
-              )
+              if (this.project.matches(this.project.options.keyTypes, file, exported))
                 result = true;
               else {
                 const found = this.project.exported(file, exported);
@@ -295,27 +291,8 @@ export class UsageEvaluator {
     if (!declaration?.is("ImportDeclaration")) return UNKNOWN;
     const source = declaration.node.source.value;
     const name = path.is("ImportSpecifier") ? (keyName(path.node.imported) ?? "") : "default";
-    const intl = source === "next-intl" || source === "next-intl/server";
-    if (
-      intl &&
-      [
-        "useTranslations",
-        "getTranslations",
-        "createTranslator",
-        "useMessages",
-        "getMessages",
-      ].includes(name)
-    ) {
-      return {
-        kind: EUsageValueKind.Factory,
-        factory:
-          name === "createTranslator"
-            ? EUsageFactory.Translator
-            : ["useMessages", "getMessages"].includes(name)
-              ? EUsageFactory.Messages
-              : EUsageFactory.Translations,
-      };
-    }
+    const factory = this.project.options.adapter?.factories[source]?.[name];
+    if (factory) return { kind: EUsageValueKind.Factory, factory };
     if (source === "react" && name === "useState") {
       return { kind: EUsageValueKind.Factory, factory: EUsageFactory.State };
     }
@@ -323,14 +300,12 @@ export class UsageEvaluator {
     if (catalog !== undefined) return { kind: EUsageValueKind.Catalog, prefix: catalog };
     const file = this.project.resolveImport(context.module.file, source);
     if (!file || !/\.tsx?$/.test(file)) return UNKNOWN;
-    const relative = this.project.relative(file);
-    if (relative === "src/i18n/messages.ts" && name === "loadMessages") {
+    const { keyTypes, messageLoaders, translatorTypes } = this.project.options;
+    if (this.project.matches(messageLoaders, file, name))
       return { kind: EUsageValueKind.Factory, factory: EUsageFactory.Messages };
-    }
-    if (relative === "src/i18n/i18n.types.ts" && name === "TMessageKey") return MESSAGE_REFERENCE;
-    if (relative === "src/i18n/translate.ts" && name === "ITranslator") {
+    if (this.project.matches(keyTypes, file, name)) return MESSAGE_REFERENCE;
+    if (this.project.matches(translatorTypes, file, name))
       return { kind: EUsageValueKind.Translator, namespaces: textValue("") };
-    }
     const imported = this.context(file);
     if (path.is("ImportNamespaceSpecifier")) {
       return {
@@ -730,14 +705,15 @@ export class UsageEvaluator {
       const options =
         fn.factory === EUsageFactory.Translator || (argument?.is("ObjectExpression") ?? false);
       const objects = this.alternatives(first, depth + 1);
+      const option = this.project.options.adapter?.namespaceOption ?? "namespace";
       const namespace =
         options &&
         objects.every(
-          (value) => value.kind === EUsageValueKind.Object && !value.properties.has("namespace"),
+          (value) => value.kind === EUsageValueKind.Object && !value.properties.has(option),
         )
           ? textValue("")
           : options
-            ? this.property(first, ["namespace"], depth + 1)
+            ? this.property(first, [option], depth + 1)
             : first;
       return { kind: EUsageValueKind.Translator, namespaces: namespace };
     }

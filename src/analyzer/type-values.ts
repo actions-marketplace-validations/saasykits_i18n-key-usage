@@ -135,8 +135,11 @@ export function evaluateType(
     const name = child(path, "typeName");
     if (!name.is("Identifier")) return UNKNOWN;
     if (
-      name.node.name === "TMessageKey" &&
-      evaluator.project.relative(context.module.file) === "src/i18n/i18n.types.ts"
+      evaluator.project.matches(
+        evaluator.project.options.keyTypes,
+        context.module.file,
+        name.node.name,
+      )
     )
       return { kind: EUsageValueKind.Reference };
     const parameters = child(path, "typeArguments");

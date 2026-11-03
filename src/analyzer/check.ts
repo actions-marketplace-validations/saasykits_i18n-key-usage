@@ -1,4 +1,5 @@
 import { isNodeType, type NodePath, type TNodeOf } from "../ast/path";
+import { KEY_LITERAL } from "./defaults";
 import { UsageEvaluator } from "./evaluator";
 import { child, children } from "./paths";
 import { UsageProject } from "./project";
@@ -30,7 +31,17 @@ class UsageChecker {
     files: 0,
   };
 
+  private readonly keyProperties: Set<string>;
+  private readonly validationLibraries: Set<string>;
+  private readonly literalKeys: RegExp | undefined;
+
   constructor(private readonly options: IUsageOptions) {
+    this.keyProperties = new Set(options.keyProperties);
+    this.validationLibraries = new Set(options.validationLibraries);
+    const prefixes = (options.literalKeyPrefixes ?? []).map(escapeRegExp);
+    this.literalKeys = prefixes.length
+      ? new RegExp(`^(?:${prefixes.join("|")})[a-zA-Z0-9_.]+$`)
+      : undefined;
     this.project = new UsageProject(options);
     this.evaluator = new UsageEvaluator(this.project);
   }
@@ -288,14 +299,19 @@ class UsageChecker {
     let value = this.evaluator.evaluate(callee, context);
     let raw = false;
     let probe = false;
+    const adapter = this.options.adapter;
+    const method =
+      callee.is("MemberExpression") && callee.node.property.type === "Identifier"
+        ? callee.node.property.name
+        : undefined;
     if (
-      callee.is("MemberExpression") &&
-      callee.node.property.type === "Identifier" &&
-      ["rich", "markup", "raw", "has"].includes(callee.node.property.name)
+      adapter &&
+      method &&
+      [...adapter.keyMethods, ...adapter.rawMethods, ...adapter.probeMethods].includes(method)
     ) {
       value = this.evaluator.evaluate(child(callee, "object"), context);
-      raw = callee.node.property.name === "raw";
-      probe = callee.node.property.name === "has";
+      raw = adapter.rawMethods.includes(method);
+      probe = adapter.probeMethods.includes(method);
     }
     for (const target of this.evaluator.alternatives(value)) {
       const first = children(path, "arguments")[0];
@@ -337,12 +353,15 @@ class UsageChecker {
         : [target];
       for (const fn of functions) {
         if (fn.kind !== EUsageValueKind.Function) continue;
-        if (
-          this.project.relative(fn.context.module.file) === "src/i18n/translate.ts" &&
-          fn.path.is("FunctionDeclaration") &&
-          fn.path.node.id?.name === "translateMessage"
-        ) {
-          const key = children(path, "arguments")[1];
+        const name = fn.path.node.id?.name;
+        const keyFunction = name
+          ? this.options.keyFunctions?.find(
+              (item) =>
+                item.export === name && item.file === this.project.relative(fn.context.module.file),
+            )
+          : undefined;
+        if (keyFunction && fn.path.is("FunctionDeclaration")) {
+          const key = children(path, "arguments")[keyFunction.argument];
           if (key)
             for (const candidate of this.evaluator.strings(this.evaluator.evaluate(key, context)))
               if (this.project.keys.has(candidate)) this.result.used.add(candidate);
@@ -427,10 +446,8 @@ class UsageChecker {
               ? property.node.key.name
               : "";
           if (
-            ["error", "message", "messageKey", "labelKey", "titleKey", "descriptionKey"].includes(
-              key,
-            ) &&
-            /^[a-zA-Z]+\.[a-zA-Z0-9_.]+$/.test(path.node.value) &&
+            this.keyProperties.has(key) &&
+            KEY_LITERAL.test(path.node.value) &&
             !path.findParent((parent) => parent.isTSType())
           )
             this.use(path.node.value, path, context, false);
@@ -456,14 +473,14 @@ class UsageChecker {
               if (
                 binding?.path.is("ImportSpecifier") &&
                 declaration?.is("ImportDeclaration") &&
-                declaration.node.source.value === "zod" &&
-                /^[a-zA-Z]+\.[a-zA-Z0-9_.]+$/.test(path.node.value)
+                this.validationLibraries.has(declaration.node.source.value) &&
+                KEY_LITERAL.test(path.node.value)
               )
                 this.use(path.node.value, path, context, false);
             }
           }
           if (
-            /^errors\.[a-zA-Z0-9_.]+$/.test(path.node.value) &&
+            this.literalKeys?.test(path.node.value) &&
             !path.findParent((parent) => parent.isTSType() || parent.is("ImportDeclaration"))
           ) {
             if (
@@ -506,6 +523,10 @@ class UsageChecker {
       .sort();
     return this.result;
   }
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 export function checkMessageUsage(options: IUsageOptions): IUsageResult {
